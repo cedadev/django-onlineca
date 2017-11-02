@@ -32,5 +32,10 @@ if __name__ == "__main__":
         packages = find_packages(),
         include_package_data = True,
         zip_safe = False,
-        install_requires = ['django', 'ContrailCA', 'pyOpenSSL'],
+        install_requires = [
+            'django',
+            'jasmin-django-utils',
+            'ContrailCA',
+            'pyOpenSSL',
+        ],
     )

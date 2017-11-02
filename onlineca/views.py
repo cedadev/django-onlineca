@@ -42,17 +42,23 @@ def certificate(request):
     Handler for ``/certificate/``.
 
     Issues a new user certificate from the given Certificate Signing Request.
+
+    The user must be authenticated before entering this view, either by
+    middleware or by decorating this view.
     """
+    # The user must be authenticated somehow
+    # We don't use the login_required decorator because we have no opinion on
+    # how that happens.
+    if not request.user.is_authenticated:
+        return http.HttpResponse(status = 403)
+
     csr = request.POST.get('certificate_request')
     if not csr:
         return http.HttpBadRequest('No certificate request given in POST params')
 
     log.info('Issuing cert for csr: %r', csr)
 
-    # TODO: Deprecate PEM cert request support.
-    # Support decoding based on PEM encoded request or similar, base64
-    # encoded request.  The latter is a better approach, support both forms
-    # for now until clients can be updated
+    # We support PEM-encoded or base64-encoded ASN1 CSRs.
     try:
         csr = crypto.load_certificate_request(crypto.FILETYPE_PEM, csr)
     except crypto.Error:
@@ -64,7 +70,7 @@ def certificate(request):
             log.exception('Error loading input csr: %r', csr)
             return http.HttpBadRequest('Error loading certificate request')
 
-    # Get the subject name to use using the configured generator
+    # Get the subject name using the configured generator
     subject_name = x509_name(onlineca_settings.SUBJECT_NAME_GENERATOR(request))
 
     # Issue the certificate
@@ -76,6 +82,7 @@ def certificate(request):
     # Dump the certificate in PEM format
     cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
     # Add any additional CA certificates in the trust chain
-    cert_pem += ''.join(onlineca_settings.CA_CERT_CHAIN)
+    for ca_cert in onlineca_settings.CA_CERT_CHAIN:
+        cert_pem += crypto.dump_certificate(crypto.FILETYPE_PEM, ca_cert)
     # Return the issued certificate
     return http.HttpResponse(content = cert_pem, content_type = 'text/plain')

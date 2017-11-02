@@ -5,98 +5,113 @@ Settings utilities for the django-onlineca package.
 from OpenSSL import crypto
 
 from django.conf import settings
-from django.utils.module_loading import import_string
 from django.core.exceptions import ImproperlyConfigured
 
+from jasmin_django_utils.appsettings import (
+    SettingsObject,
+    Setting,
+    ImportStringSetting
+)
 
-class OnlineCASettings:
+
+def default_certificate_authority(settings):
     """
-    Settings object for the django-onlineca package.
+    Generate a certificate authority from other settings.
     """
-    DEFAULTS = {
-        'SUBJECT_NAME_GENERATOR': 'onlineca.utils.default_subject_name_generator',
-        'CA_CERT_CHAIN_PATHS': [],
-        'MIN_KEY_BITS': 2048,
-        'NOT_BEFORE_TIME_SECS': 0,
-        'NOT_AFTER_TIME_SECS': 259200,  # Default to 72 hour lifetime
-        'KEY_PASSWORD': None,
-    }
-    IMPORT_STRINGS = (
-        'SUBJECT_NAME_GENERATOR',
+    # If not given in user_settings, configure a certificate authority
+    # from other settings
+    from contrail.security.ca.impl import CertificateAuthority
+    return CertificateAuthority.from_keywords(
+        cert = settings.CA_CERT,
+        key = settings.CA_KEY,
+        min_key_nbits = settings.MIN_KEY_BITS,
+        not_before_time_nsecs = settings.NOT_BEFORE_TIME_NSECS,
+        not_after_time_nsecs = settings.NOT_AFTER_TIME_NSECS
     )
 
-    def __init__(self, user_settings = {}):
-        self.user_settings = user_settings
 
-    def _default_ca_cert_chain(self):
-        # If not given in user_settings, certs for the CA chain can be loaded
-        # from named files instead
-        def read(path):
-            with open(path) as f:
-                return f.read()
-        return [read(path) for path in self.CA_CERT_CHAIN_PATHS]
+def load_pem_encoded_cert(path):
+    """
+    Attempts to load a PEM-encoded certificate from the given path.
 
-    def _default_certificate_authority(self):
-        # If not given in user_settings, configure a certificate authority
-        # from other settings
-        from contrail.security.ca.impl import CertificateAuthority
-        val = CertificateAuthority.from_keywords(
-            cert = self.CERT,
-            key = self.KEY,
-            min_key_nbits = self.MIN_KEY_BITS,
-            not_before_time_nsecs = self.NOT_BEFORE_TIME_SECS,
-            not_after_time_nsecs = self.NOT_AFTER_TIME_SECS
-        )
-
-    def _default_cert(self):
-        # If not given in user_settings, cert can be loaded from a path
-        with open(self.CERT_PATH) as cert_file:
+    Raises ``ImproperlyConfigured`` if the path does not contain a valid
+    certificate.
+    """
+    try:
+        with open(path) as cert_file:
             cert = cert_file.read()
         return crypto.load_certificate(crypto.FILETYPE_PEM, cert)
-
-    def _default_key(self):
-        # If not given in user_settings, key can be loaded from a path with
-        # optional password
-        with open(self.KEY_PATH) as key_file:
-            key = key_file.read()
-        password = self.KEY_PASSWORD
-        return crypto.load_privatekey(
-            crypto.FILETYPE_PEM, key, *([password] if password else [])  
+    except Exception:
+        raise ImproperlyConfigured(
+            'Failed to parse PEM-encoded certificate: {}'.format(path)
         )
 
-    def __getattr__(self, attr):
-        if attr in self.user_settings:
-            # First, try user settings
-            val = self.user_settings[attr]
-        elif attr in self.DEFAULTS:
-            # Then try the defaults dict (for simple defaults)
-            val = self.DEFAULTS[attr]
-        elif hasattr(self, '_default_' + attr.lower()):
-            # Then see if there is a method to generate the default
-            val = getattr(self, '_default_' + attr.lower())()
-        else:
-            # If no default is available, the setting is required in user_settings
-            raise ImproperlyConfigured("ONLINECA setting required: {}".format(attr))
 
-        # If the setting is an import string, perform the import
-        if attr in self.IMPORT_STRINGS:
-            val = import_string(val)
-
-        # Check that any certificates given in the CA_CERT_CHAIN setting are valid,
-        # whether they come directly from user_settings or from CA_CERT_CHAIN_PATHS
-        if attr == 'CA_CERT_CHAIN':
-            for cert in val:
-                try:
-                    crypto.load_certificate(crypto.FILETYPE_PEM, cert)
-                except Exception:
-                    raise ImproperlyConfigured(
-                        'Failed to parse CA_CERT_CHAIN element as PEM-formatted '
-                        'certificate: {}'.format(cert)
-                    )
-
-        # Before returning, cache the value for future use
-        setattr(self, attr, val)
-        return val
+def default_ca_cert(settings):
+    """
+    Load the CA cert from the path specified in the ``CA_CERT_PATH`` setting.
+    """
+    return load_pem_encoded_cert(settings.CA_CERT_PATH)
 
 
-onlineca_settings = OnlineCASettings(getattr(settings, 'ONLINECA', {}))
+def default_ca_key(settings):
+    """
+    Load the CA key from the path specified in the ``CA_KEY_PATH`` setting. If
+    the key is protected by a password, the password should also be given in the
+    ``CA_KEY_PASSWORD`` setting.
+    """
+    with open(settings.CA_KEY_PATH) as key_file:
+        key = key_file.read()
+    password = settings.CA_KEY_PASSWORD
+    return crypto.load_privatekey(
+        crypto.FILETYPE_PEM, key, *([password] if password else [])
+    )
+
+
+def default_ca_cert_chain(settings):
+    """
+    Load the certificates for the CA trust chain from the paths specified in the
+    ``CA_CERT_CHAIN_PATHS`` setting.
+    """
+    return [
+        load_pem_encoded_cert(path)
+        for path in settings.CA_CERT_CHAIN_PATHS
+    ]
+
+
+class OnlineCASettings(SettingsObject):
+    #: Directory containing the trustroots for the CA.
+    TRUSTROOTS_DIR = Setting()
+    #: Function for generating a certificate subject name for the current request.
+    SUBJECT_NAME_GENERATOR = ImportStringSetting(
+        default = 'onlineca.utils.default_subject_name_generator'
+    )
+    #: Template used by :py:func:`onlineca.utils.default_subject_name_generator`.
+    SUBJECT_NAME_TEMPLATE = Setting()
+    #: Certificate authority object used to issue certificates.
+    CERTIFICATE_AUTHORITY = Setting(default = default_certificate_authority)
+    #: X509 certificate object to use for the certificate authority.
+    CA_CERT = Setting(default = default_ca_cert)
+    #: Path to file containing the PEM-encoded certificate for the CA.
+    CA_CERT_PATH = Setting()
+    #: Private key object to use for the certificate authority.
+    CA_KEY = Setting(default = default_ca_key)
+    #: Path to file containing the PEM-encoded, possibly encrypted private key
+    #: for the CA.
+    CA_KEY_PATH = Setting()
+    #: Private key password if file given in :py:attr:`CA_KEY_PATH`.
+    CA_KEY_PASSWORD = Setting(default = None)
+    #: The minimum number of bits allowed in issued certificates.
+    MIN_KEY_BITS = Setting(default = 2048)
+    #: The number of seconds from issuing until the certificate becomes valid.
+    NOT_BEFORE_TIME_NSECS = Setting(default = 0)
+    #: The number of seconds from issuing that the certificate remains valid.
+    NOT_AFTER_TIME_NSECS = Setting(default = 259200)  # Default 72 hours
+    #: List of X509 certificate objects comprising the trust chain for the CA.
+    CA_CERT_CHAIN = Setting(default = default_ca_cert_chain)
+    #: List of paths containing the PEM-encoded certificates comprising the
+    #: trust chain for the CA.
+    CA_CERT_CHAIN_PATHS = Setting(default = ())
+
+
+onlineca_settings = OnlineCASettings('ONLINECA', getattr(settings, 'ONLINECA', {}))
