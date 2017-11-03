@@ -31,8 +31,8 @@ def trustroots(request):
             continue
         with open(filepath, 'rb') as trustroot_file:
             content = trustroot_file.read()
-        trust_roots += b'%s=%s\n'.format(filename.encode('utf-8'),
-                                         base64.b64encode(content))
+        trust_roots += b'%s=%s\n' % (filename.encode('utf-8'),
+                                     base64.b64encode(content))
     return http.HttpResponse(content = trust_roots, content_type = 'text/plain')
 
 
