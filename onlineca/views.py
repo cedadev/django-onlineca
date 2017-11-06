@@ -54,7 +54,11 @@ def certificate(request):
 
     csr = request.POST.get('certificate_request')
     if not csr:
-        return http.HttpBadRequest('No certificate request given in POST params')
+        return http.HttpResponse(
+            status = 400,
+            content = 'Missing POST parameter certificate_request.',
+            content_type = 'text/plain'
+        )
 
     log.info('Issuing cert for csr: %r', csr)
 
@@ -68,7 +72,11 @@ def certificate(request):
             csr = crypto.load_certificate_request(crypto.FILETYPE_ASN1, decoded)
         except crypto.Error:
             log.exception('Error loading input csr: %r', csr)
-            return http.HttpBadRequest('Error loading certificate request')
+            return http.HttpResponse(
+                status = 400,
+                content = 'Error loading certificate request.',
+                content_type = 'text/plain'
+            )
 
     # Get the subject name using the configured generator
     subject_name = x509_name(onlineca_settings.SUBJECT_NAME_GENERATOR(request))
