@@ -2,7 +2,7 @@
 Django views for the django-onlineca package.
 """
 
-import os, base64, logging
+import os, base64, logging, binascii
 
 from OpenSSL import crypto
 
@@ -70,7 +70,7 @@ def certificate(request):
         try:
             decoded = base64.b64decode(csr)
             csr = crypto.load_certificate_request(crypto.FILETYPE_ASN1, decoded)
-        except crypto.Error:
+        except (binascii.Error, crypto.Error):
             log.exception('Error loading input csr: %r', csr)
             return http.HttpResponse(
                 status = 400,
