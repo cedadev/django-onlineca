@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
-import os, re
+import os
 from setuptools import setup, find_packages
 
-import versioneer
-
-
 here = os.path.abspath(os.path.dirname(__file__))
-
 
 with open(os.path.join(here, 'README.md')) as f:
     README = f.read()
@@ -15,8 +11,8 @@ with open(os.path.join(here, 'README.md')) as f:
 if __name__ == "__main__":
     setup(
         name = 'django-onlineca',
-        version = versioneer.get_version(),
-        cmdclass = versioneer.get_cmdclass(),
+        setup_requires = ['setuptools_scm'],
+        use_scm_version = True,
         description = 'Django app that can issue short-lived user certificates over HTTP.',
         long_description = README,
         classifiers = [
