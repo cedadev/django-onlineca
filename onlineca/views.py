@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Django views for the django-onlineca package.
 """

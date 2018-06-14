@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 URL configuration for the django-onlineca package.
 """
