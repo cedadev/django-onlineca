@@ -30,7 +30,7 @@ if __name__ == "__main__":
         zip_safe = False,
         install_requires = [
             'django',
-            'jasmin-django-utils',
+            'django-settings-object',
             'ContrailCA',
             'pyOpenSSL',
         ],

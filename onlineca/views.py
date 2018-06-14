@@ -2,7 +2,10 @@
 Django views for the django-onlineca package.
 """
 
-import os, base64, logging, binascii
+import os
+import base64
+import logging
+import binascii
 
 from OpenSSL import crypto
 

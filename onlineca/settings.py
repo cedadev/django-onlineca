@@ -7,11 +7,7 @@ from OpenSSL import crypto
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from jasmin_django_utils.appsettings import (
-    SettingsObject,
-    Setting,
-    ImportStringSetting
-)
+from settings_object import SettingsObject, Setting, ImportStringSetting
 
 
 def default_certificate_authority(settings):
