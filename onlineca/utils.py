@@ -7,23 +7,29 @@ import re
 
 from OpenSSL import crypto
 
-from django.core.exceptions import PermissionDenied
-
 from .settings import onlineca_settings
+
+
+def default_user_to_string_mapper(user):
+    """
+    The default user-to-string mapper. Returns the username of the user.
+    """
+    return user.username
 
 
 def default_subject_name_generator(request):
     """
     The default subject name generator.
 
-    Replaces ``{user}`` in the configured ``SUBJECT_NAME_TEMPLATE`` with the username
-    of the current user.
+    First, the current user is processed using the configured
+    ``USER_TO_STRING_MAPPER``. The result is then used to replace ``{user}`` in
+    the configured ``SUBJECT_NAME_TEMPLATE``.
 
     Requires that the request has an authenticated user.
     """
-    if not request.user.is_authenticated:
-        raise PermissionDenied('User must be authenticated')
-    return onlineca_settings.SUBJECT_NAME_TEMPLATE.format(user = request.user.username)
+    return onlineca_settings.SUBJECT_NAME_TEMPLATE.format(
+        user = onlineca_settings.USER_TO_STRING_MAPPER(request.user)
+    )
 
 
 #: Lookup table for allowed DN components

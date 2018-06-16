@@ -5,7 +5,6 @@ Settings utilities for the django-onlineca package.
 
 from OpenSSL import crypto
 
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from settings_object import SettingsObject, Setting, ImportStringSetting
@@ -83,6 +82,12 @@ class OnlineCASettings(SettingsObject):
     SUBJECT_NAME_GENERATOR = ImportStringSetting(
         default = 'onlineca.utils.default_subject_name_generator'
     )
+    #: Function for converting a Django user to a string.
+    #: Used by :py:func:`onlineca.utils.default_subject_name_generator` - the
+    #: result is substituted into :attr:`SUBJECT_NAME_TEMPLATE` as ``{user}``.
+    USER_TO_STRING_MAPPER = ImportStringSetting(
+        default = 'onlineca.utils.default_user_to_string_mapper'
+    )
     #: Template used by :py:func:`onlineca.utils.default_subject_name_generator`.
     SUBJECT_NAME_TEMPLATE = Setting()
     #: Certificate authority object used to issue certificates.
@@ -111,4 +116,4 @@ class OnlineCASettings(SettingsObject):
     CA_CERT_CHAIN_PATHS = Setting(default = ())
 
 
-onlineca_settings = OnlineCASettings('ONLINECA', getattr(settings, 'ONLINECA', {}))
+onlineca_settings = OnlineCASettings('ONLINECA')
